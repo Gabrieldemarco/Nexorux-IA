@@ -946,15 +946,6 @@ if all_uploads:
 if files_changed:
     safe_rerun()
 
-active = st.session_state.get("active_conversation", "Default")
-messages = st.session_state.get("conversations", {}).get(active, [])
-
-if not messages:
-    st.info("👋 Escribe abajo. Usa **🎤** y **➕** en la barra del mensaje.")
-
-for message in messages:
-    render_chat_message(message)
-
 user_prompt = st.chat_input("Escribe tu mensaje…")
 render_chat_input_actions()
 
@@ -970,27 +961,27 @@ if user_prompt:
     safe_rerun()
 
 
-# --- AUTO-REFRESH EN VIVO (sin recarga de página, solo el chat) ---
-if st.session_state.get("live_mode", False) and "conversations" in st.session_state:
-    import time as _time, json as _json
-    _elapsed = 0
-    _max_wait = 30
-    _interval = 2
-    _ph = st.empty()
-    while _elapsed < _max_wait:
+# --- RENDERIZADO DEL CHAT (con o sin auto-refresh) ---
+import json as _json
+
+@st.fragment(run_every=2.0 if st.session_state.get("live_mode", False) else None)
+def _render_chat():
+    if st.session_state.get("live_mode", False):
         try:
             with open(VERSION_PATH) as _f:
                 _v = _json.load(_f).get("version", 0)
             if _v != st.session_state.get("_known_version", -1):
                 st.session_state["_known_version"] = _v
-                _ph.empty()
-                st.rerun()
+                st.session_state["conversations"] = load_conversations_from_db()
         except Exception:
             pass
-        _elapsed += _interval
-        if _elapsed < _max_wait:
-            _ph.caption(f"🔄 Live - próxima revisión en {_max_wait - _elapsed}s")
-            _time.sleep(_interval)
-    _ph.empty()
+    act = st.session_state.get("active_conversation", "Default")
+    msgs = st.session_state.get("conversations", {}).get(act, [])
+    if not msgs:
+        st.info("👋 Escribe abajo. Usa **🎤** y **➕** en la barra del mensaje.")
+    for m in msgs:
+        render_chat_message(m)
+
+_render_chat()
 
 
