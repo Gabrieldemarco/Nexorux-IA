@@ -516,43 +516,45 @@ def call_ollama_api(user_input: str, images: Optional[List[str]] = None) -> Opti
     Usa /api/chat para modelos multimodales con imágenes, /api/generate para texto.
     """
     model_to_use = st.session_state.get("active_model", default_model())
-    
-    # Si hay imágenes, usar /api/chat con formato de mensajes
-    if images:
+    active = st.session_state.get("active_conversation", "Default")
+    convo = st.session_state.get("conversations", {}).get(active, [])
+
+    has_vision = model_supports_vision(model_to_use)
+
+    # Si no se pasaron imágenes explícitas, buscar la última imagen del historial
+    if not images and has_vision:
+        for msg in reversed(convo):
+            if msg.get("role") == "user" and msg.get("image_b64"):
+                images = [msg["image_b64"]]
+                break
+
+    if images and has_vision:
+        # /api/chat con formato de mensajes (soporta imágenes)
         messages = []
-        # Historial de conversación
-        active = st.session_state.get("active_conversation", "Default")
-        convo = st.session_state.get("conversations", {}).get(active, [])
-        
         for message in convo:
-            # Solo incluir mensajes de texto en el historial (sin imágenes anteriores)
-            if isinstance(message.get("content"), str) and not message["content"].startswith("[Archivo"):
-                messages.append({
-                    "role": message["role"],
-                    "content": message["content"]
-                })
-        
-        # Mensaje actual con imagen - formato correcto para Ollama
+            content = message.get("content", "")
+            if isinstance(content, str) and not content.startswith("[Archivo"):
+                msg_entry = {"role": message["role"], "content": content}
+                if message.get("image_b64"):
+                    msg_entry["images"] = [message["image_b64"]]
+                messages.append(msg_entry)
+
         messages.append({
             "role": "user",
             "content": user_input,
-            "images": images  # Ollama espera array de strings base64
+            "images": images,
         })
-        
+
         payload = {
             "model": model_to_use,
             "messages": messages,
             "stream": False,
-            "options": {
-                "num_ctx": 4096  # Aumentar contexto para imágenes
-            }
+            "options": {"num_ctx": 4096},
         }
         endpoint = "http://localhost:11434/api/chat"
     else:
-        # Para texto puro, usar /api/generate con formato de chat
+        # Texto puro: /api/generate con formato de chat
         history_messages = []
-        active = st.session_state.get("active_conversation", "Default")
-        convo = st.session_state.get("conversations", {}).get(active, [])
         for message in convo:
             role = message["role"]
             content = message["content"]
@@ -561,13 +563,13 @@ def call_ollama_api(user_input: str, images: Optional[List[str]] = None) -> Opti
                     history_messages.append(f"<|im_start|>user\n{content}<|im_end|>")
                 else:
                     history_messages.append(f"<|im_start|>assistant\n{content}<|im_end|>")
-        
+
         prompt = "".join(history_messages) + f"<|im_start|>user\n{user_input}<|im_end|>\n<|im_start|>assistant\n"
-        
+
         payload = {
             "model": model_to_use,
             "prompt": prompt,
-            "stream": False
+            "stream": False,
         }
         endpoint = "http://localhost:11434/api/generate"
 
