@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 from dotenv import load_dotenv
 import sqlite3
 import requests
@@ -287,7 +288,7 @@ def render_chat_message(message: dict) -> None:
 
 def render_chat_input_actions() -> None:
     """Coloca 🎤 y ➕ al costado del chat sin mover el widget de Streamlit."""
-    st.html(
+    components.html(
         """
         <script>
         (function () {
@@ -479,6 +480,7 @@ def render_chat_input_actions() -> None:
         })();
         </script>
         """,
+        height=0,
     )
 
 # ===============================================================
@@ -850,6 +852,23 @@ with st.sidebar:
     if st.button("🗑️ Limpiar archivos en cola", use_container_width=True):
         st.session_state["uploaded_files"] = []
         safe_rerun()
+
+    st.markdown("---")
+    with st.expander("🔄 Auto-refresh"):
+        auto_refresh = st.checkbox("Activar", key="auto_refresh", value=st.session_state.get("auto_refresh", False))
+        if auto_refresh:
+            interval = st.slider("Intervalo (seg)", 5, 120, 30, key="refresh_interval")
+            st.caption("Las conversaciones se actualizarán automáticamente.")
+            components.html(
+                f"""
+                <script>
+                setTimeout(function() {{
+                    window.location.reload();
+                }}, {interval * 1000});
+                </script>
+                """,
+                height=0,
+            )
 
 # --- ÁREA PRINCIPAL: chat ---
 st.title("✨ Asistente Conversacional Local")
