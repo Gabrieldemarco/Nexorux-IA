@@ -629,11 +629,23 @@ def call_ollama_api(user_input: str, images: Optional[List[str]] = None) -> Opti
                 delay = initial_delay * (2 ** attempt)
                 time.sleep(delay)
             else:
+                body = e.response.text[:500] if e.response.text else ""
+                import json as _json
+                info = {"error_body": body, "model": payload.get("model"), "has_options": "options" in payload, "endpoint": endpoint}
+                if "messages" in payload:
+                    msgs = payload["messages"]
+                    info["msg_count"] = len(msgs)
+                    info["msg_roles"] = [m.get("role") for m in msgs]
+                    info["msg_has_images"] = ["images" in m for m in msgs]
+                    info["msg_content_lens"] = [len(m.get("content", "")) for m in msgs]
+                else:
+                    info["prompt_len"] = len(payload.get("prompt", ""))
+                with open("vora_payload_dump.json", "w") as _f:
+                    _json.dump(info, _f, indent=2)
                 if status_code == 404:
                     current = st.session_state.get("active_model", default_model())
                     st.session_state["_last_api_error"] = f"Modelo no encontrado: '{current}'. Modelos disponibles: {', '.join(available_models())}"
                 else:
-                    body = e.response.text[:500] if e.response.text else ""
                     st.session_state["_last_api_error"] = f"Error HTTP {status_code}: {e.response.reason}. Body: {body}"
                 return None
 
