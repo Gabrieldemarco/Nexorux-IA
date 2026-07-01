@@ -1,0 +1,12 @@
+# App principal
+streamlit
+requests
+python-dotenv
+pillow
+
+# API secundaria (app.py)
+fastapi
+uvicorn
+
+# Gemini (test_gemini.py)
+google-genai
