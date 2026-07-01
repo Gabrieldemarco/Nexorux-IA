@@ -909,35 +909,9 @@ with st.sidebar:
 
     st.markdown("---")
     with st.expander("🔄 Live (tiempo real)"):
-        live = st.checkbox("Activar", key="live_mode", value=st.session_state.get("live_mode", False))
-        if live:
-            st.caption("Detecta cambios automáticamente cuando alguien escribe.")
-            components.html(
-                """
-                <div id="vora-live"></div>
-                <script>
-                (function() {
-                    var lastVer = -1;
-                    var checkUrl = "http://localhost:8765/version.json";
-                    function poll() {
-                        fetch(checkUrl + "?t=" + Date.now())
-                            .then(function(r) { return r.json(); })
-                            .then(function(data) {
-                                var v = data.version || 0;
-                                if (lastVer >= 0 && v !== lastVer) {
-                                    window.location.reload();
-                                }
-                                lastVer = v;
-                            })
-                            .catch(function() {});
-                    }
-                    poll();
-                    setInterval(poll, 3000);
-                })();
-                </script>
-                """,
-                height=0,
-            )
+        st.checkbox("Activar", key="live_mode", value=st.session_state.get("live_mode", False))
+        if st.session_state.get("live_mode", False):
+            st.caption("Chat actualizado automáticamente cuando alguien escribe. Sin recargar la página.")
 
 # --- ÁREA PRINCIPAL: chat ---
 st.title("✨ Asistente Conversacional Local")
@@ -994,5 +968,29 @@ if user_prompt:
     if full_response:
         append_message(active, {"role": "assistant", "content": full_response})
     safe_rerun()
+
+
+# --- AUTO-REFRESH EN VIVO (sin recarga de página, solo el chat) ---
+if st.session_state.get("live_mode", False) and "conversations" in st.session_state:
+    import time as _time, json as _json
+    _elapsed = 0
+    _max_wait = 30
+    _interval = 2
+    _ph = st.empty()
+    while _elapsed < _max_wait:
+        try:
+            with open(VERSION_PATH) as _f:
+                _v = _json.load(_f).get("version", 0)
+            if _v != st.session_state.get("_known_version", -1):
+                st.session_state["_known_version"] = _v
+                _ph.empty()
+                st.rerun()
+        except Exception:
+            pass
+        _elapsed += _interval
+        if _elapsed < _max_wait:
+            _ph.caption(f"🔄 Live - próxima revisión en {_max_wait - _elapsed}s")
+            _time.sleep(_interval)
+    _ph.empty()
 
 
