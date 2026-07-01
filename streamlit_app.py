@@ -573,6 +573,15 @@ def call_ollama_api(user_input: str, images: Optional[List[str]] = None) -> Opti
         }
         endpoint = "http://localhost:11434/api/generate"
 
+    import json as _json
+    with open("vora_debug.log", "a") as _f:
+        _f.write(f"MODEL: {model_to_use} | has_vision: {has_vision} | images_provided: {images is not None} | endpoint: {endpoint}\n")
+        _f.write(f"PAYLOAD KEYS: {list(payload.keys())} | model: {payload.get('model')}\n")
+        if images and has_vision:
+            _f.write(f"MESSAGES COUNT: {len(payload.get('messages', []))}\n")
+            for i, m in enumerate(payload.get('messages', [])):
+                _f.write(f"  msg[{i}]: role={m.get('role')} | has_images={'images' in m} | content_len={len(m.get('content',''))}\n")
+
     MAX_RETRIES = 4
     initial_delay = 2
 
@@ -641,8 +650,14 @@ def call_ollama_api(user_input: str, images: Optional[List[str]] = None) -> Opti
 
         except Exception as e:
             st.error(f"❌ Error desconocido: {type(e).__name__}: {e}")
+            import traceback
+            with open("vora_error.log", "a") as f:
+                f.write(f"call_ollama_api error ({model_to_use}): {type(e).__name__}: {e}\n")
+                traceback.print_exc(file=f)
             return None
     
+    with open("vora_debug.log", "a") as _f:
+        _f.write(f"FINAL RETURN None (model={model_to_use}, endpoint={endpoint})\n")
     return None
 
 
@@ -691,13 +706,19 @@ def _process_file(f) -> bool:
                 "Descríbela en detalle en español: qué ves, colores, objetos, personas y texto visible."
             )
             if model_supports_vision(current_model):
-                resp = call_ollama_api(prompt, images=[b64])
-                if resp:
-                    append_message(active, {"role": "assistant", "content": resp})
-                else:
+                try:
+                    resp = call_ollama_api(prompt, images=[b64])
+                    if resp:
+                        append_message(active, {"role": "assistant", "content": resp})
+                    else:
+                        append_message(active, {
+                            "role": "assistant",
+                            "content": f"No pude analizar la imagen con '{current_model}'. Verifica que Ollama este corriendo e intentalo de nuevo.",
+                        })
+                except Exception as e:
                     append_message(active, {
                         "role": "assistant",
-                        "content": f"No pude analizar la imagen con '{current_model}'. Verifica que Ollama este corriendo e intentalo de nuevo.",
+                        "content": f"Error inesperado con '{current_model}': {type(e).__name__}: {e}",
                     })
             else:
                 vision_models = _vision_models_available()
