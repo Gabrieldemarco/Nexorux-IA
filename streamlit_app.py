@@ -633,7 +633,8 @@ def call_ollama_api(user_input: str, images: Optional[List[str]] = None) -> Opti
                     current = st.session_state.get("active_model", default_model())
                     st.session_state["_last_api_error"] = f"Modelo no encontrado: '{current}'. Modelos disponibles: {', '.join(available_models())}"
                 else:
-                    st.session_state["_last_api_error"] = f"Error HTTP {status_code}: {e.response.reason}"
+                    body = e.response.text[:500] if e.response.text else ""
+                    st.session_state["_last_api_error"] = f"Error HTTP {status_code}: {e.response.reason}. Body: {body}"
                 return None
 
         except Exception as e:
