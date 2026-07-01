@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 from dotenv import load_dotenv
 import sqlite3
 import requests
@@ -270,12 +269,13 @@ def render_chat_message(message: dict) -> None:
                     st.image(
                         base64.b64decode(message["image_b64"]),
                         caption=message.get("content") or "Imagen",
-                        use_container_width=True,
+                        width='stretch',
                     )
                 except TypeError:
                     st.image(
                         base64.b64decode(message["image_b64"]),
                         caption=message.get("content") or "Imagen",
+                        width='stretch',
                     )
             except Exception:
                 st.markdown(message.get("content", "📷 Imagen"))
@@ -287,7 +287,7 @@ def render_chat_message(message: dict) -> None:
 
 def render_chat_input_actions() -> None:
     """Coloca 🎤 y ➕ al costado del chat sin mover el widget de Streamlit."""
-    components.html(
+    st.html(
         """
         <script>
         (function () {
