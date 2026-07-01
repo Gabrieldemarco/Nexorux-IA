@@ -13,6 +13,46 @@ from pathlib import Path
 load_dotenv()
 
 DB_PATH = Path(__file__).with_name("vora_memory.sqlite3")
+VERSION_PATH = Path(__file__).with_name("version.json")
+
+
+def _start_version_server() -> None:
+    """Servidor HTTP mínimo para que los clientes consulten la versión."""
+    import http.server
+    import socketserver
+    import threading
+
+    class Handler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=str(Path(__file__).parent), **kwargs)
+        def end_headers(self):
+            self.send_header("Access-Control-Allow-Origin", "*")
+            super().end_headers()
+        def log_message(self, *a):
+            pass
+
+    try:
+        httpd = socketserver.TCPServer(("127.0.0.1", 8765), Handler)
+        t = threading.Thread(target=httpd.serve_forever, daemon=True)
+        t.start()
+    except OSError:
+        pass  # Puerto ocupado: otro proceso ya lo abrió
+
+
+_start_version_server()
+
+
+def bump_version() -> None:
+    """Incrementa la versión para notificar a otros clientes."""
+    import json as _json
+    try:
+        with open(VERSION_PATH) as _f:
+            v = _json.load(_f)
+    except Exception:
+        v = {"version": 0}
+    v["version"] = v.get("version", 0) + 1
+    with open(VERSION_PATH, "w") as _f:
+        _json.dump(v, _f)
 
 
 def init_memory_db() -> None:
@@ -87,6 +127,7 @@ def persist_conversation(name: str) -> None:
 
 
 def delete_conversation_from_db(name: str) -> None:
+    bump_version()
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("DELETE FROM messages WHERE conversation_name = ?", (name,))
@@ -95,6 +136,7 @@ def delete_conversation_from_db(name: str) -> None:
 
 def persist_message(conversation_name: str, message: dict) -> None:
     persist_conversation(conversation_name)
+    bump_version()
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
             """
@@ -209,6 +251,18 @@ else:
 # Inicializar estructura de conversaciones (permitir múltiples chats)
 if "conversations" not in st.session_state:
     st.session_state["conversations"] = load_conversations_from_db()
+
+# Detectar cambios de otros clientes
+import json as _json
+try:
+    with open(VERSION_PATH) as _f:
+        _v = _json.load(_f).get("version", 0)
+    _old = st.session_state.get("_known_version", -1)
+    if _old >= 0 and _v != _old:
+        st.session_state["conversations"] = load_conversations_from_db()
+    st.session_state["_known_version"] = _v
+except Exception:
+    pass
 if "active_conversation" not in st.session_state:
     st.session_state["active_conversation"] = next(iter(st.session_state["conversations"]), "Default")
 
@@ -854,17 +908,32 @@ with st.sidebar:
         safe_rerun()
 
     st.markdown("---")
-    with st.expander("🔄 Auto-refresh"):
-        auto_refresh = st.checkbox("Activar", key="auto_refresh", value=st.session_state.get("auto_refresh", False))
-        if auto_refresh:
-            interval = st.slider("Intervalo (seg)", 5, 120, 30, key="refresh_interval")
-            st.caption("Las conversaciones se actualizarán automáticamente.")
+    with st.expander("🔄 Live (tiempo real)"):
+        live = st.checkbox("Activar", key="live_mode", value=st.session_state.get("live_mode", False))
+        if live:
+            st.caption("Detecta cambios automáticamente cuando alguien escribe.")
             components.html(
-                f"""
+                """
+                <div id="vora-live"></div>
                 <script>
-                setTimeout(function() {{
-                    window.location.reload();
-                }}, {interval * 1000});
+                (function() {
+                    var lastVer = -1;
+                    var checkUrl = "http://localhost:8765/version.json";
+                    function poll() {
+                        fetch(checkUrl + "?t=" + Date.now())
+                            .then(function(r) { return r.json(); })
+                            .then(function(data) {
+                                var v = data.version || 0;
+                                if (lastVer >= 0 && v !== lastVer) {
+                                    window.location.reload();
+                                }
+                                lastVer = v;
+                            })
+                            .catch(function() {});
+                    }
+                    poll();
+                    setInterval(poll, 3000);
+                })();
                 </script>
                 """,
                 height=0,
