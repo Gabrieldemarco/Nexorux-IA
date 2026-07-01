@@ -534,10 +534,10 @@ def call_ollama_api(user_input: str, images: Optional[List[str]] = None) -> Opti
         for message in convo:
             content = message.get("content", "")
             if isinstance(content, str) and not content.startswith("[Archivo"):
-                msg_entry = {"role": message["role"], "content": content}
-                if message.get("image_b64"):
-                    msg_entry["images"] = [message["image_b64"]]
-                messages.append(msg_entry)
+                messages.append({
+                    "role": message["role"],
+                    "content": content,
+                })
 
         messages.append({
             "role": "user",
