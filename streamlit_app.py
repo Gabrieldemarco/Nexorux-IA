@@ -573,15 +573,6 @@ def call_ollama_api(user_input: str, images: Optional[List[str]] = None) -> Opti
         }
         endpoint = "http://localhost:11434/api/generate"
 
-    import json as _json
-    with open("vora_debug.log", "a") as _f:
-        _f.write(f"MODEL: {model_to_use} | has_vision: {has_vision} | images_provided: {images is not None} | endpoint: {endpoint}\n")
-        _f.write(f"PAYLOAD KEYS: {list(payload.keys())} | model: {payload.get('model')}\n")
-        if images and has_vision:
-            _f.write(f"MESSAGES COUNT: {len(payload.get('messages', []))}\n")
-            for i, m in enumerate(payload.get('messages', [])):
-                _f.write(f"  msg[{i}]: role={m.get('role')} | has_images={'images' in m} | content_len={len(m.get('content',''))}\n")
-
     MAX_RETRIES = 4
     initial_delay = 2
 
@@ -626,38 +617,33 @@ def call_ollama_api(user_input: str, images: Optional[List[str]] = None) -> Opti
 
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
             if attempt < MAX_RETRIES - 1:
-                delay = initial_delay * (2 ** attempt) 
-                st.warning(f"⚠️ Error de conexión: {type(e).__name__}. Reintentando en {delay:.1f} segundos...")
+                delay = initial_delay * (2 ** attempt)
                 time.sleep(delay)
             else:
-                st.error("❌ FALLO PERMANENTE DE CONEXIÓN. Verifica que Ollama esté ejecutándose.")
+                st.session_state["_last_api_error"] = f"FALLO DE CONEXIÓN: {type(e).__name__}. Verifica que Ollama esté ejecutándose."
                 return None
 
         except requests.exceptions.HTTPError as e:
             status_code = e.response.status_code
             if status_code in [429, 500, 502, 503, 504] and attempt < MAX_RETRIES - 1:
-                delay = initial_delay * (2 ** attempt) 
-                st.warning(f"⚠️ Error HTTP {status_code}. Reintentando en {delay:.1f} segundos...")
+                delay = initial_delay * (2 ** attempt)
                 time.sleep(delay)
             else:
                 if status_code == 404:
                     current = st.session_state.get("active_model", default_model())
-                    st.error(f"🚨 Modelo no encontrado: '{current}'. "
-                             f"Modelos disponibles: {', '.join(available_models())}")
+                    st.session_state["_last_api_error"] = f"Modelo no encontrado: '{current}'. Modelos disponibles: {', '.join(available_models())}"
                 else:
-                    st.error(f"🚨 Error HTTP {status_code}: {e.response.reason}")
+                    st.session_state["_last_api_error"] = f"Error HTTP {status_code}: {e.response.reason}"
                 return None
 
         except Exception as e:
-            st.error(f"❌ Error desconocido: {type(e).__name__}: {e}")
+            st.session_state["_last_api_error"] = f"{type(e).__name__}: {e}"
             import traceback
             with open("vora_error.log", "a") as f:
                 f.write(f"call_ollama_api error ({model_to_use}): {type(e).__name__}: {e}\n")
                 traceback.print_exc(file=f)
             return None
     
-    with open("vora_debug.log", "a") as _f:
-        _f.write(f"FINAL RETURN None (model={model_to_use}, endpoint={endpoint})\n")
     return None
 
 
@@ -711,9 +697,10 @@ def _process_file(f) -> bool:
                     if resp:
                         append_message(active, {"role": "assistant", "content": resp})
                     else:
+                        err = st.session_state.pop("_last_api_error", "Error desconocido")
                         append_message(active, {
                             "role": "assistant",
-                            "content": f"No pude analizar la imagen con '{current_model}'. Verifica que Ollama este corriendo e intentalo de nuevo.",
+                            "content": f"No pude analizar la imagen con '{current_model}'.\n\nDetalle: {err}",
                         })
                 except Exception as e:
                     append_message(active, {
