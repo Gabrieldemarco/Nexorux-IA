@@ -697,7 +697,7 @@ def _process_file(f) -> bool:
                 else:
                     append_message(active, {
                         "role": "assistant",
-                        "content": "No pude analizar la imagen. Verifica que Ollama este corriendo e intentalo de nuevo.",
+                        "content": f"No pude analizar la imagen con '{current_model}'. Verifica que Ollama este corriendo e intentalo de nuevo.",
                     })
             else:
                 vision_models = _vision_models_available()
