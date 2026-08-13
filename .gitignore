@@ -1,16 +1,57 @@
-# Entorno y secretos
-.env
-venv/
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Base de datos local
-*.sqlite3
+# Virtual environment
+venv/
+.venv/
+env/
+.env
+
+# Streamlit
+.streamlit/
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
 # OS
 Thumbs.db
 .DS_Store
+desktop.ini
+
+# Project specific
+nexorux_memory.sqlite3
+nexorux_error.log
+nexorux_payload_dump.json
+version.json
+
+# Logs
+*.log
+logs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/

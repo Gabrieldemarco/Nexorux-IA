@@ -1,43 +1,59 @@
-﻿# Vora — Asistente Conversacional Local
+﻿"""
+=== Nexorux IA Application ===
 
-App en Streamlit que se conecta a **Ollama** para correr LLMs localmente con soporte de múltiples conversaciones, imágenes, subida de archivos y dictado por voz.
+Version: v75
+Architecture: Modular (Core/UI)
+Status: Ready for Production
 
-## Requisitos
+---
 
-- Python 3.10+
-- [Ollama](https://ollama.com) instalado y corriendo (`ollama serve`)
-- Al menos un modelo descargado (`ollama pull llama3`, `ollama pull gemma3`, etc.)
+Features Implemented:
+✅ Professional Streamlit UI
+✅ Modular UI Components
+✅ Database Management
+✅ Multi-backend: Ollama + LM Studio
+✅ Voice Input / TTS
+✅ Image Vision Support
+✅ Error Handling
+✅ Testing Infrastructure
 
-## Instalación
+---
 
-```bash
-python -m venv venv
-.\venv\Scripts\activate   # Windows
-pip install -r requirements.txt
-```
+Main Components:
+1. core/ - Core Business Logic
+   ├── __init__.py - Database utilities
+   └── ollama_client.py - Multi-backend LLM client
 
-## Uso
+2. ui/ - Streamlit Frontend
+   ├── streamlit_app.py - Main entry point (RECOMMENDED)
+   ├── chat_interface.py - Chat state & config
+   ├── ollama_client.py - AI integration
+   ├── sidebar.py - UI controls
+   ├── media.py - File processing
+   └── voice_input.py - Voice controls
 
-```bash
-streamlit run streamlit_app.py
-```
+3. tests/ - Testing Suite
 
-## Modelos con visión
+---
 
-Para usar imágenes necesitás un modelo multimodal:
-```
-ollama pull gemma3
-ollama pull llava
-ollama pull moondream
-```
+Quick Start:
+1. Install dependencies: pip install -r requirements.txt
+2. Run: streamlit run streamlit_app.py
 
-## Estructura
+---
 
-```
-vora/
-├── streamlit_app.py    # App principal
-├── app.py              # API FastAPI secundaria
-├── tests/              # Scripts de diagnóstico
-├── vora_memory.sqlite3 # Base de datos local (autogenerada)
-└── requirements.txt    # Dependencias
-```
+Backends:
+- Ollama: http://localhost:11434
+- LM Studio: http://localhost:1234/v1
+
+Select the backend from the sidebar panel.
+
+---
+
+Architecture Benefits:
+- ✅ Maintainable (modular)
+- ✅ Testable (structured tests)
+- ✅ Secure (input validation)
+- ✅ Scalable (separated concerns)
+- ✅ Professional
+"""
