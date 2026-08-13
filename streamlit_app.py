@@ -635,14 +635,23 @@ if "live_mode" not in st.session_state:
     st.session_state["live_mode"] = False
 if "tts_response" not in st.session_state:
     st.session_state["tts_response"] = False
+if "_preferred_model" not in st.session_state:
+    st.session_state["_preferred_model"] = {}
 
-models = get_models(get_active_backend())
-active_model = st.session_state.get("active_model")
-if models and active_model not in models:
-    st.session_state["active_model"] = models[0]
+# Cargar el backend disponible y su modelo preferido
+current_backend = get_active_backend()
+current_models = get_models(current_backend)
+current_active_model = st.session_state.get("active_model")
+
+if current_models and current_active_model not in current_models:
+    preferred = st.session_state["_preferred_model"].get(current_backend)
+    if preferred and preferred in current_models:
+        st.session_state["active_model"] = preferred
+    else:
+        st.session_state["active_model"] = current_models[0]
 
 if st.session_state.get("model_select") != st.session_state.get("active_model"):
-    if st.session_state.get("active_model") in models:
+    if st.session_state.get("active_model") in current_models:
         st.session_state["model_select"] = st.session_state["active_model"]
 
 # ===============================================================
@@ -653,22 +662,41 @@ with st.sidebar:
     st.markdown('<div class="nexorux-brand"><div class="nexorux-logo">N</div><div><div class="nexorux-title">Nexorux IA</div><div class="nexorux-subtitle">Local · Privada · Offline</div></div></div>', unsafe_allow_html=True)
 
     st.markdown('<div class="nexorux-sidebar-section"><div class="nexorux-sidebar-title">Backend</div>', unsafe_allow_html=True)
-    backend_options = list(BACKENDS.keys())
-    backend_labels = {b: BACKENDS[b]["label"] for b in backend_options}
+    available_backends = []
+    for b in BACKENDS:
+        if check_connection(b):
+            available_backends.append(b)
+
+    if not available_backends:
+        st.warning("No se detectó ningún backend local disponible.")
+        st.caption("Verificá que Ollama o LM Studio estén corriendo.")
+        available_backends = list(BACKENDS.keys())
+
     active_backend = get_active_backend()
-    backend_index = backend_options.index(active_backend) if active_backend in backend_options else 0
+    if active_backend not in available_backends:
+        active_backend = available_backends[0]
+        set_active_backend(active_backend)
+
+    backend_labels = {b: BACKENDS[b]["label"] for b in available_backends}
+    backend_index = available_backends.index(active_backend) if active_backend in available_backends else 0
     selected_backend = st.radio(
         "Motor local",
-        backend_options,
+        available_backends,
         index=backend_index,
         format_func=lambda b: backend_labels[b],
         key="backend_select",
     )
     if selected_backend != active_backend:
+        st.session_state["_preferred_model"][active_backend] = st.session_state.get("active_model")
         set_active_backend(selected_backend)
         st.cache_data.clear()
-        st.session_state["model_select"] = default_model(selected_backend)
-        st.session_state["active_model"] = st.session_state["model_select"]
+        models = get_models(selected_backend)
+        preferred = st.session_state["_preferred_model"].get(selected_backend)
+        if preferred and preferred in models:
+            st.session_state["active_model"] = preferred
+        else:
+            st.session_state["active_model"] = models[0] if models else default_model(selected_backend)
+        st.session_state["model_select"] = st.session_state["active_model"]
         st.rerun()
 
     st.caption(f"Endpoint: {BACKENDS[selected_backend]['base_url']}")
@@ -690,6 +718,7 @@ with st.sidebar:
         "Modelo de IA",
         get_models(get_active_backend()),
         key="model_select",
+        value=st.session_state.get("active_model"),
         on_change=_on_model_select,
         help="Para imágenes usá un modelo con visión: gemma4, llava, moondream...",
     )
